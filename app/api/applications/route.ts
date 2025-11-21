@@ -1,94 +1,188 @@
-// app/api/applications/route.ts
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
-
-interface Application {
-  [key: string]: unknown
-  id?: number
-  status?: string
-  created_at?: string
-}
-
-interface ApiResponse {
-  success?: boolean
-  data?: Application[] | { data?: Application[] }
-}
-
-type ApplicationWithType = Application & { type: string }
+// Define the base URL for your Laravel API
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader) {
+    // Get the auth token from cookies
+    const cookieStore = await cookies()
+    const token = cookieStore.get('auth_token')?.value
+
+    if (!token) {
       return NextResponse.json(
-        { error: "No authorization token provided" },
+        { error: 'Unauthorized', message: 'No authentication token found' },
         { status: 401 }
       )
     }
 
-    const headers = {
-      Authorization: authHeader,
-      Accept: "application/json",
+    console.log('Fetching applications with token:', token.substring(0, 10) + '...')
+
+    // First, get the current user's information to extract user_id
+    const userResponse = await fetch(`${API_BASE_URL}/user`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    })
+
+    if (!userResponse.ok) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: 'Failed to verify user' },
+        { status: 401 }
+      )
     }
 
-    // Fetch all application types in parallel - matching your Laravel routes
-    const [
-      cedulas,
-      marriageLicenses,
-      businessPermits,
-      healthCerts,
-      buildingPermits,
-      medicalAssistance,
-      policeClearance,
-      fireSafety,
-      barangayClearance,
-    ] = await Promise.all([
-      fetch(`${API_URL}/api/cedula`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Cedula error:", e); return {} }),
-      fetch(`${API_URL}/api/marriage-license`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Marriage error:", e); return {} }),
-      fetch(`${API_URL}/api/business-permit`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Business error:", e); return {} }),
-      fetch(`${API_URL}/api/health-certificate`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Health error:", e); return {} }),
-      fetch(`${API_URL}/api/building-permit`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Building error:", e); return {} }),
-      fetch(`${API_URL}/api/medical-assistance`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Medical error:", e); return {} }),
-      fetch(`${API_URL}/api/police-clearance`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Police error:", e); return {} }),
-      fetch(`${API_URL}/api/fire-safety-inspection`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Fire error:", e); return {} }),
-      fetch(`${API_URL}/api/barangay-clearance`, { headers }).then(r => r.json() as Promise<ApiResponse>).catch(e => { console.error("Barangay error:", e); return {} }),
-    ])
+    const userData = await userResponse.json()
+    const userId = userData.id || userData.user?.id
 
-    // Helper to extract array from response
-    const extractArray = (response: ApiResponse): Application[] => {
-      if (Array.isArray(response)) return response
-      if (response?.success && response?.data) {
-        if (Array.isArray(response.data)) return response.data
-        if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-          const nested = response.data as { data?: unknown }
-          if (Array.isArray(nested.data)) return nested.data
-        }
-      }
-      if (response?.data && Array.isArray(response.data)) return response.data
-      return []
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: 'User ID not found' },
+        { status: 401 }
+      )
     }
 
-    // Combine all applications with their type
-    const allApplications: ApplicationWithType[] = [
-      ...extractArray(cedulas).map((app: Application) => ({ ...app, type: "Cedula" })),
-      ...extractArray(marriageLicenses).map((app: Application) => ({ ...app, type: "Marriage License" })),
-      ...extractArray(businessPermits).map((app: Application) => ({ ...app, type: "Business Permit" })),
-      ...extractArray(healthCerts).map((app: Application) => ({ ...app, type: "Health Certificate" })),
-      ...extractArray(buildingPermits).map((app: Application) => ({ ...app, type: "Building Permit" })),
-      ...extractArray(medicalAssistance).map((app: Application) => ({ ...app, type: "Medical Assistance" })),
-      ...extractArray(policeClearance).map((app: Application) => ({ ...app, type: "Police Clearance" })),
-      ...extractArray(fireSafety).map((app: Application) => ({ ...app, type: "Fire Safety Inspection" })),
-      ...extractArray(barangayClearance).map((app: Application) => ({ ...app, type: "Barangay Clearance" })),
+    console.log('Fetching applications for user_id:', userId)
+
+    // Fetch all application types from Laravel API
+    const endpoints = [
+      { path: '/barangay-clearance', name: 'Barangay Clearance' },
+      { path: '/business-permit', name: 'Business Permit', fallbacks: ['/business-permits'] },
+      { path: '/building-permit', name: 'Building Permit' },
+      { path: '/cedula', name: 'Cedula' },
+      { path: '/medical-assistance', name: 'Medical Assistance' },
+      { path: '/health-certificate', name: 'Health Certificate' }
     ]
 
-    console.log(`[Applications API] Fetched ${allApplications.length} total applications`)
+    const applicationPromises = endpoints.map(async (endpoint) => {
+      // Try primary path first, then fallback paths
+      const pathsToTry = [endpoint.path, ...(endpoint.fallbacks || [])]
+      
+      for (const path of pathsToTry) {
+        try {
+          const url = `${API_BASE_URL}${path}`
+          console.log(`Attempting to fetch from: ${url}`)
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            cache: 'no-store',
+          })
 
-    return NextResponse.json(allApplications)
+          console.log(`${endpoint.name} (${path}) response status:`, response.status)
+
+          if (!response.ok) {
+            console.error(`Failed to fetch ${path}:`, {
+              status: response.status,
+              statusText: response.statusText
+            })
+            
+            if (response.status === 404 && pathsToTry.indexOf(path) < pathsToTry.length - 1) {
+              console.log(`${endpoint.name} not found at ${path}, trying next path...`)
+              continue
+            }
+            
+            return []
+          }
+
+          const data = await response.json()
+          console.log(`${endpoint.name} raw data:`, JSON.stringify(data).substring(0, 200))
+          
+          // Handle different response formats from Laravel
+          let applications = []
+          
+          if (Array.isArray(data)) {
+            applications = data
+          } else if (data.data) {
+            if (Array.isArray(data.data)) {
+              applications = data.data
+            } else if (data.data.data && Array.isArray(data.data.data)) {
+              // Handle paginated response
+              applications = data.data.data
+            }
+          } else if (data.applications && Array.isArray(data.applications)) {
+            applications = data.applications
+          }
+
+          // Filter applications by user_id on the frontend
+          console.log(`${endpoint.name} received ${applications.length} applications (before filtering)`)
+
+          const userApplications = applications.filter((app: any) => {
+            const appUserId = app.user_id || app.userId || app.applicant_id
+            const matches = appUserId === userId
+            if (!matches) {
+              console.log(`Filtering out application ${app.id}: user_id ${appUserId} !== ${userId}`)
+            }
+            return matches
+          })
+
+          console.log(`${endpoint.name} filtered to ${userApplications.length} applications for user ${userId}`)
+
+          // Add type field using the endpoint name
+          const processedApps = userApplications.map((app: any) => ({
+            ...app,
+            type: app.type || endpoint.name,
+            id: app.id,
+            reference_number: app.reference_number || app.referenceNumber || 'N/A',
+            status: app.status || 'pending',
+            created_at: app.created_at || app.createdAt || new Date().toISOString(),
+          }))
+          
+          return processedApps
+          
+        } catch (error) {
+          console.error(`Error fetching ${path}:`, error)
+          
+          if (pathsToTry.indexOf(path) < pathsToTry.length - 1) {
+            console.log(`Error with ${path}, trying next path...`)
+            continue
+          }
+          
+          return []
+        }
+      }
+      
+      return []
+    })
+
+    // Wait for all requests to complete
+    const results = await Promise.all(applicationPromises)
+    
+    // Flatten the results into a single array
+    const allApplications = results.flat()
+    
+    console.log(`Total applications fetched for user ${userId}: ${allApplications.length}`)
+    console.log('Application types:', allApplications.map(app => app.type))
+
+    return NextResponse.json({
+      success: true,
+      data: allApplications,
+      count: allApplications.length,
+      user_id: userId,
+      breakdown: {
+        'Barangay Clearance': results[0]?.length || 0,
+        'Business Permit': results[1]?.length || 0,
+        'Building Permit': results[2]?.length || 0,
+        'Cedula': results[3]?.length || 0,
+        'Medical Assistance': results[4]?.length || 0,
+        'Health Certificate': results[5]?.length || 0,
+      }
+    })
   } catch (error) {
-    console.error("[Applications API] Error:", error)
+    console.error('Error in applications API route:', error)
     return NextResponse.json(
-      { error: "Failed to fetch applications", details: String(error) },
+      { 
+        error: 'Internal Server Error', 
+        message: error instanceof Error ? error.message : 'Failed to fetch applications'
+      },
       { status: 500 }
     )
   }

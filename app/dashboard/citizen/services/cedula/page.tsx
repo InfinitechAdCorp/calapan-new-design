@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, FileText, Loader2, AlertCircle } from "lucide-react"
+import { ArrowLeft, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,7 +30,9 @@ export default function CedulaPage() {
     occupation: "",
     tinNumber: "",
     height: "",
+    heightUnit: "cm",
     weight: "",
+    weightUnit: "kg",
   })
 
   // Auto-fill form with logged-in user data
@@ -52,7 +54,9 @@ export default function CedulaPage() {
             occupation: user.occupation || "",
             tinNumber: user.tin_number || "",
             height: user.height || "",
+            heightUnit: user.height_unit || "cm",
             weight: user.weight || "",
+            weightUnit: user.weight_unit || "kg",
           }))
 
           toast({
@@ -60,7 +64,6 @@ export default function CedulaPage() {
             description: "Your profile information has been pre-filled.",
           })
         } else {
-          // User not authenticated, redirect to login
           toast({
             title: "Authentication Required",
             description: "Please log in to continue.",
@@ -133,7 +136,7 @@ export default function CedulaPage() {
     // Validate birth date is not in the future
     const birthDate = new Date(formData.birthDate)
     const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time to compare dates only
+    today.setHours(0, 0, 0, 0)
     
     if (birthDate > today) {
       toast({
@@ -180,18 +183,18 @@ export default function CedulaPage() {
       })
       return false
     }
-    if (!formData.height || parseFloat(formData.height) <= 0) {
+    if (!formData.height || parseFloat(formData.height) <= 0 || parseFloat(formData.height) > 999.99) {
       toast({
         title: "Validation Error",
-        description: "Valid height is required",
+        description: "Valid height is required (max 999.99)",
         variant: "destructive",
       })
       return false
     }
-    if (!formData.weight || parseFloat(formData.weight) <= 0) {
+    if (!formData.weight || parseFloat(formData.weight) <= 0 || parseFloat(formData.weight) > 999.99) {
       toast({
         title: "Validation Error",
-        description: "Valid weight is required",
+        description: "Valid weight is required (max 999.99)",
         variant: "destructive",
       })
       return false
@@ -203,7 +206,6 @@ export default function CedulaPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate form before submitting
     if (!validateForm()) {
       return
     }
@@ -217,7 +219,21 @@ export default function CedulaPage() {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          birth_date: formData.birthDate,
+          civil_status: formData.civilStatus,
+          citizenship: formData.citizenship,
+          occupation: formData.occupation,
+          tin_number: formData.tinNumber,
+          height: formData.height,
+          height_unit: formData.heightUnit,
+          weight: formData.weight,
+          weight_unit: formData.weightUnit,
+        }),
       })
 
       const data = await response.json()
@@ -422,26 +438,59 @@ export default function CedulaPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="height">Height (cm) *</Label>
-                      <Input
-                        id="height"
-                        type="number"
-                        placeholder="170"
-                        value={formData.height}
-                        onChange={(e) => updateFormData("height", e.target.value)}
-                        required
-                      />
+                      <Label htmlFor="height">Height *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="height"
+                          type="number"
+                          step="0.01"
+                          placeholder="170.5"
+                          value={formData.height}
+                          onChange={(e) => updateFormData("height", e.target.value)}
+                          className="flex-1"
+                          required
+                        />
+                        <Select
+                          value={formData.heightUnit}
+                          onValueChange={(value) => updateFormData("heightUnit", value)}
+                        >
+                          <SelectTrigger className="w-20">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cm">cm</SelectItem>
+                            <SelectItem value="in">in</SelectItem>
+                            <SelectItem value="ft">ft</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="weight">Weight (kg) *</Label>
-                      <Input
-                        id="weight"
-                        type="number"
-                        placeholder="65"
-                        value={formData.weight}
-                        onChange={(e) => updateFormData("weight", e.target.value)}
-                        required
-                      />
+                      <Label htmlFor="weight">Weight *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="weight"
+                          type="number"
+                          step="0.01"
+                          placeholder="65.5"
+                          value={formData.weight}
+                          onChange={(e) => updateFormData("weight", e.target.value)}
+                          className="flex-1"
+                          required
+                        />
+                        <Select
+                          value={formData.weightUnit}
+                          onValueChange={(value) => updateFormData("weightUnit", value)}
+                        >
+                          <SelectTrigger className="w-20">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="lbs">lbs</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,56 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params  // Resolve the Promise to get `id`
+    const { id } = await params
+    
+    // Get the session token from cookies
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get("session_token")?.value
 
-    // Forward the request to Laravel backend
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/${id}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json(data, { status: response.status })
+    if (!sessionToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized. Please login.",
+        },
+        { status: 401 }
+      )
     }
 
-    return NextResponse.json(data, { status: 200 })
-  } catch (error) {
-    console.error('Error fetching report:', error)
-    return NextResponse.json(
+    // Forward the request to Laravel backend
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/reports/${id}`,
       {
-        success: false,
-        message: 'Failed to fetch report',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+      }
     )
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params  // Resolve the Promise to get `id`
-    const body = await request.json()
-
-    // Forward the request to Laravel backend
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/${id}/status`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
 
     const data = await response.json()
 
@@ -58,49 +40,13 @@ export async function PUT(
       return NextResponse.json(data, { status: response.status })
     }
 
-    return NextResponse.json(data, { status: 200 })
+    return NextResponse.json(data)
   } catch (error) {
-    console.error('Error updating report:', error)
+    console.error("Error in report detail API:", error)
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to update report',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params  // Resolve the Promise to get `id`
-
-    // Forward the request to Laravel backend
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json(data, { status: response.status })
-    }
-
-    return NextResponse.json(data, { status: 200 })
-  } catch (error) {
-    console.error('Error deleting report:', error)
-    return NextResponse.json(
-      {
-        success: false,
-      message: 'Failed to delete report',
-      error: error instanceof Error ? error.message : 'Unknown error',
+        message: "Internal server error",
       },
       { status: 500 }
     )

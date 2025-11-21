@@ -1,78 +1,234 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { Newspaper, ArrowRight } from "lucide-react"
+import * as React from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { X } from "lucide-react"
 
-const news = [
-  {
-    id: 1,
-    title: "City Infrastructure Expansion Project Approved",
-    excerpt: "The municipal council has approved a major infrastructure development initiative...",
-    category: "Development",
-    readTime: "5 min read",
-  },
-  {
-    id: 2,
-    title: "Local Businesses Thrive with New Support Program",
-    excerpt: "A comprehensive program designed to support and grow local businesses in our community...",
-    category: "Business",
-    readTime: "4 min read",
-  },
-  {
-    id: 3,
-    title: "Community Health Initiative Reaches Milestone",
-    excerpt: "The health department celebrates reaching 50,000 citizens vaccinated this quarter...",
-    category: "Health",
-    readTime: "6 min read",
-  },
-]
+interface NewsArticle {
+  id: number
+  title: string
+  content: string
+  category: string
+  image?: string
+  status: string
+  published_at?: string
+  created_at: string
+  author?: {
+    id: number
+    name: string
+    email: string
+  }
+}
 
 export default function NewsSection() {
-  return (
-    <section id="news" className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-orange-50 to-emerald-50">
-      <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true, margin: "-100px" }}
-          className="mb-16"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <Newspaper className="w-6 h-6 text-emerald-500" />
-            <h2 className="text-4xl sm:text-5xl font-bold gradient-text">Latest News</h2>
-          </div>
-          <p className="text-gray-600 text-lg max-w-2xl">Read the latest stories from Calapan City</p>
-        </motion.div>
+  const [news, setNews] = React.useState<NewsArticle[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const [selectedArticle, setSelectedArticle] = React.useState<NewsArticle | null>(null)
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {news.map((item, i) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              viewport={{ once: true, margin: "-100px" }}
-              whileHover={{ scale: 1.02 }}
-              className="group p-6 rounded-2xl bg-white border border-gray-100 hover:border-orange-200 cursor-pointer transition-all shadow-sm hover:shadow-md"
+  React.useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/news/published?per_page=3')
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch news')
+        }
+        
+        const result = await response.json()
+        
+        if (result.success && result.data) {
+          const newsData = result.data.data || result.data
+          setNews(newsData)
+        }
+      } catch (err) {
+        console.error('Error fetching news:', err)
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchNews()
+  }, [])
+
+  // Close modal when pressing Escape
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedArticle(null)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [])
+
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    if (selectedArticle) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+  }, [selectedArticle])
+
+  return (
+    <>
+      <div className="py-16 px-4 max-w-6xl mx-auto">
+        <div className="mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-primary-600 mb-3">Latest News</h2>
+          <p className="text-slate-700">Read the latest stories and updates from our city</p>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            <p className="mt-4 text-slate-600">Loading news...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600 mb-4">Failed to load news: {error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="text-primary-600 font-semibold hover:text-accent-600"
             >
-              <div className="mb-4">
-                <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-100 to-orange-100 text-gray-700">
-                  {item.category}
-                </span>
+              Try Again
+            </button>
+          </div>
+        ) : news.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-slate-600">No news available at the moment.</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-6">
+            {news.map((article, index) => (
+              <motion.div
+                key={article.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                onClick={() => setSelectedArticle(article)}
+                className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-1"
+              >
+                <div className="relative h-48 overflow-hidden bg-slate-200">
+                  <img
+                    src={article.image ? `${process.env.NEXT_PUBLIC_IMAGE_URL}/${article.image}` : "/placeholder.svg"}
+                    alt={article.title}
+                    className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                  />
+                </div>
+                <div className="p-6">
+                  <p className="text-sm text-slate-500 mb-2">
+                    {new Date(article.published_at || article.created_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                  <h3 className="text-xl font-bold text-slate-900 mb-3 line-clamp-2">{article.title}</h3>
+                  <p className="text-slate-700 line-clamp-3">
+                    {article.content.substring(0, 150)}...
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {selectedArticle && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedArticle(null)}
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            >
+              {/* Modal Header with Image */}
+              <div className="relative h-64 md:h-80 overflow-hidden">
+                {selectedArticle.image ? (
+                  <img
+                    src={`${process.env.NEXT_PUBLIC_IMAGE_URL}/${selectedArticle.image}`}
+                    alt={selectedArticle.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-r from-green-500 via-yellow-500 to-amber-500"></div>
+                )}
+                <button
+                  onClick={() => setSelectedArticle(null)}
+                  className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-lg hover:bg-slate-100 transition-colors"
+                  aria-label="Close modal"
+                >
+                  <X className="w-6 h-6 text-slate-700" />
+                </button>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3 group-hover:gradient-text transition-all">
-                {item.title}
-              </h3>
-              <p className="text-gray-600 text-sm mb-4">{item.excerpt}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">{item.readTime}</span>
-                <ArrowRight className="w-4 h-4 text-orange-500 group-hover:translate-x-1 transition-transform" />
+
+              {/* Modal Content */}
+              <div className="p-6 md:p-8">
+                {/* Category Badge */}
+                <span className="inline-block bg-primary-100 text-primary-700 px-3 py-1 rounded-full text-sm font-medium mb-4">
+                  {selectedArticle.category}
+                </span>
+
+                {/* Title */}
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+                  {selectedArticle.title}
+                </h2>
+
+                {/* Meta Info */}
+                <div className="flex items-center gap-4 text-slate-600 mb-6 pb-6 border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>
+                      {new Date(selectedArticle.published_at || selectedArticle.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  {selectedArticle.author && (
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span>By {selectedArticle.author.name}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="prose prose-slate max-w-none">
+                  <p className="text-slate-700 text-lg leading-relaxed whitespace-pre-line">
+                    {selectedArticle.content}
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-slate-50 px-6 md:px-8 py-4 border-t border-slate-200">
+                <button
+                  onClick={() => setSelectedArticle(null)}
+                  className="w-full md:w-auto px-6 py-2 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+                >
+                  Close
+                </button>
               </div>
             </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

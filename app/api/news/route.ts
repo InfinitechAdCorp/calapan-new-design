@@ -2,11 +2,14 @@ import { type NextRequest, NextResponse } from "next/server"
 
 const API_URL = process.env.NEXT_PUBLIC_URL || "http://localhost:8000"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    console.log("[v0] News API GET - Fetching from:", `${API_URL}/api/news`)
+    const searchParams = request.nextUrl.searchParams
+    const queryString = searchParams.toString()
+    
+    console.log("[v0] News API GET - Fetching from:", `${API_URL}/api/news/published${queryString ? `?${queryString}` : ''}`)
 
-    const response = await fetch(`${API_URL}/api/news`, {
+    const response = await fetch(`${API_URL}/api/news/published${queryString ? `?${queryString}` : ''}`, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -38,7 +41,6 @@ export async function GET() {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 })
   }
 }
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()

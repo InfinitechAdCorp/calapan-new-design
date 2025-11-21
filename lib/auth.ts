@@ -74,6 +74,20 @@ export const authClient = {
   async checkAuth(): Promise<boolean> {
     const user = await this.getCurrentUser()
     return !!user
+  },
+
+  async getUserRole(): Promise<string | null> {
+    const user = await this.getCurrentUser()
+    return user?.role || null
+  },
+
+  async isAdmin(): Promise<boolean> {
+    const role = await this.getUserRole()
+    return role === 'admin'
+  },
+
+  async isCitizen(): Promise<boolean> {
+    const role = await this.getUserRole()
+    return role === 'citizen'
   }
 }
-

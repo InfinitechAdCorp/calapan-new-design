@@ -65,7 +65,7 @@ export default function CitizenSidebar() {
     { icon: Grid3x3, label: 'Services', path: '/dashboard/citizen/services' },
     { icon: Newspaper, label: 'News', path: '/dashboard/citizen/news' },
     { icon: AlertTriangle, label: 'Emergency', path: '/dashboard/citizen/emergency' },
-    { icon: User, label: 'Account', path: '/dashboard/citizen/account' },
+    { icon: User, label: 'Account', path: '/dashboard/citizen/account/applications' },
   ];
 
   const quickAccessItems = [

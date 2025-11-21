@@ -1,116 +1,99 @@
-import { type NextRequest, NextResponse } from "next/server"
+// app/api/users/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const LARAVEL_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
-// GET all users
 export async function GET(request: NextRequest) {
   try {
-    // Extract token from Authorization header
-    const authHeader = request.headers.get("authorization")
-    
-    console.log("=== DEBUG INFO ===")
-    console.log("All headers:", Object.fromEntries(request.headers))
-    console.log("Auth header received:", authHeader)
-    console.log("Auth header type:", typeof authHeader)
-    
-    if (!authHeader || authHeader.trim() === "") {
-      console.log("ERROR: No auth header or empty auth header")
+    // Get token from HTTP-only cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('auth_token')?.value
+
+    if (!token) {
       return NextResponse.json(
-        { error: "No authorization token provided" },
+        { success: false, message: 'Not authenticated. Please log in again.' },
         { status: 401 }
       )
     }
 
-    const fullUrl = `${API_URL}/api/users`
-    
-    console.log("Fetching from:", fullUrl)
-    console.log("Forwarding auth header:", authHeader)
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams
+    const status = searchParams.get('status')
+    const search = searchParams.get('search')
+    const page = searchParams.get('page')
+    const perPage = searchParams.get('per_page')
 
-    const response = await fetch(fullUrl, {
-      method: "GET",
+    // Build query string
+    const queryParams = new URLSearchParams()
+    if (status && status !== 'all') queryParams.append('status', status)
+    if (search) queryParams.append('search', search)
+    if (page) queryParams.append('page', page)
+    if (perPage) queryParams.append('per_page', perPage)
+
+    const queryString = queryParams.toString()
+    const url = `${LARAVEL_API_URL}/users${queryString ? `?${queryString}` : ''}`
+
+    console.log('Fetching users:', {
+      url,
+      hasAuth: !!token,
+    })
+
+    const response = await fetch(url, {
+      method: 'GET',
       headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: authHeader, // Forward the token to Laravel
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest',
       },
     })
 
-    console.log("Response status:", response.status)
+    // Get raw text first to check what we're receiving
     const responseText = await response.text()
-    console.log("Response body:", responseText)
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `Backend error: ${response.status}`, details: responseText },
-        { status: response.status }
-      )
-    }
-
-    const data = JSON.parse(responseText)
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error("[users] Error fetching users:", error)
-    return NextResponse.json(
-      { error: "Internal server error", details: String(error) },
-      { status: 500 }
-    )
-  }
-}
-
-// PUT update user status (approve/reject)
-export async function PUT(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get("authorization")
     
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: "No authorization token provided" },
-        { status: 401 }
-      )
-    }
-
-    const body = await request.json()
-    const { userId, status, verification_status, verification_notes } = body
-
-    if (!userId || !status) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    const fullUrl = `${API_URL}/api/users/${userId}`
-    console.log("Updating at:", fullUrl)
-    console.log("Forwarding auth header:", authHeader)
-
-    const response = await fetch(fullUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: authHeader, // Forward the token to Laravel
-      },
-      body: JSON.stringify({
-        status,
-        verification_status,
-        verification_notes,
-      }),
+    console.log('Laravel raw response:', {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      textLength: responseText.length,
+      textPreview: responseText.substring(0, 200)
     })
 
-    console.log("Response status:", response.status)
-    const responseText = await response.text()
-    console.log("Response body:", responseText)
-
-    if (!response.ok) {
+    // Try to parse as JSON
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      console.error('Raw response (first 1000 chars):', responseText.substring(0, 1000))
+      
       return NextResponse.json(
-        { error: `Backend error: ${response.status}`, details: responseText },
-        { status: response.status }
+        {
+          success: false,
+          message: 'Invalid JSON response from server. Please check Laravel logs for errors.',
+          debug: {
+            status: response.status,
+            contentType: response.headers.get('content-type'),
+            preview: responseText.substring(0, 500)
+          }
+        },
+        { status: 500 }
       )
     }
 
-    const data = JSON.parse(responseText)
-    return NextResponse.json(data)
+    console.log('Laravel response:', {
+      status: response.status,
+      success: data.success,
+    })
+
+    return NextResponse.json(data, { status: response.status })
+
   } catch (error) {
-    console.error("[users] Error updating user:", error)
+    console.error('API route error:', error)
     return NextResponse.json(
-      { error: "Internal server error", details: String(error) },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error',
+      },
       { status: 500 }
     )
   }

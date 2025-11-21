@@ -1,67 +1,94 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const LARAVEL_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${API_URL}/api/announcements`, {
-      headers: {
-        "Accept": "application/json",
-      },
-    })
-    
-    if (!response.ok) {
-      const text = await response.text()
-      console.error("[v0] Laravel error response:", text.substring(0, 200))
-      return NextResponse.json({ error: "Failed to fetch announcements" }, { status: response.status })
+    const searchParams = request.nextUrl.searchParams
+    const params = new URLSearchParams()
+
+    // Forward query parameters
+    if (searchParams.get("page")) params.append("page", searchParams.get("page")!)
+    if (searchParams.get("per_page")) params.append("per_page", searchParams.get("per_page")!)
+    if (searchParams.get("category")) params.append("category", searchParams.get("category")!)
+    if (searchParams.get("search")) params.append("search", searchParams.get("search")!)
+    if (searchParams.get("is_active")) params.append("is_active", searchParams.get("is_active")!)
+
+    // Get token from HTTP-only cookie (consistent with medical-assistance route)
+    const cookieStore = await cookies()
+    const token = cookieStore.get("auth_token")?.value
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
     }
-    
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${LARAVEL_API_URL}/announcements?${params.toString()}`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    })
+
     const data = await response.json()
-    return NextResponse.json(data)
+
+    return NextResponse.json(data, { status: response.status })
   } catch (error) {
-    console.error("[v0] Error fetching announcements:", error)
-    return NextResponse.json({ error: "Failed to fetch announcements" }, { status: 500 })
+    console.error("Error fetching announcements:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to fetch announcements",
+      },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Get FormData from request (includes image file)
-    const formData = await request.formData()
-    
-    console.log("[v0] Creating announcement with FormData")
-    
-    // Forward the FormData directly to Laravel
-    const response = await fetch(`${API_URL}/api/announcements`, {
-      method: "POST",
-      headers: {
-        "Accept": "application/json",
-        // Don't set Content-Type - let the browser set it with boundary for multipart/form-data
-      },
-      body: formData,
-    })
-    
-    console.log("[v0] Laravel response status:", response.status)
-    
-    // Check if response is JSON
-    const contentType = response.headers.get("content-type")
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text()
-      console.error("[v0] Non-JSON response:", text.substring(0, 500))
+    // Get token from HTTP-only cookie (consistent with medical-assistance route)
+    const cookieStore = await cookies()
+    const token = cookieStore.get("auth_token")?.value
+
+    if (!token) {
       return NextResponse.json(
-        { error: "Server returned non-JSON response", details: text.substring(0, 200) }, 
-        { status: 500 }
+        {
+          success: false,
+          message: "Not authenticated. Please log in again.",
+        },
+        { status: 401 }
       )
     }
-    
+
+    const body = await request.json()
+
+    const response = await fetch(`${LARAVEL_API_URL}/announcements`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify(body),
+    })
+
     const data = await response.json()
+
     return NextResponse.json(data, { status: response.status })
   } catch (error) {
-    console.error("[v0] Error creating announcement:", error)
+    console.error("Error creating announcement:", error)
     return NextResponse.json(
-      { error: "Failed to create announcement", 
-        message: error instanceof Error ? error.message : "Unknown error" 
-      }, 
+      {
+        success: false,
+        message: "Failed to create announcement",
+      },
       { status: 500 }
     )
   }

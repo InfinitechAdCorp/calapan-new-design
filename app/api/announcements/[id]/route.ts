@@ -1,91 +1,149 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+const LARAVEL_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const { id } = await params
-    const response = await fetch(`${API_URL}/api/announcements/${id}`, {
-      headers: {
-        "Accept": "application/json",
-      },
-    })
     
-    if (!response.ok) {
-      const text = await response.text()
-      console.error("[v0] Laravel error response:", text.substring(0, 200))
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
-    
-    const data = await response.json()
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error("[v0] Error fetching announcement:", error)
-    return NextResponse.json({ error: "Failed to fetch announcement" }, { status: 500 })
-  }
-}
+    // Get token from HTTP-only cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get("auth_token")?.value
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await params
-    const formData = await request.formData()
-    
-    console.log("[v0] Updating announcement with FormData")
-    
-    // Laravel doesn't support PUT with FormData directly, so we need to use POST with _method
-    formData.append('_method', 'PUT')
-    
-    const response = await fetch(`${API_URL}/api/announcements/${id}`, {
-      method: "POST",
-      headers: { 
-        "Accept": "application/json",
-      },
-      body: formData,
-    })
-    
-    console.log("[v0] Laravel response status:", response.status)
-    
-    // Check if response is JSON
-    const contentType = response.headers.get("content-type")
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text()
-      console.error("[v0] Non-JSON response:", text.substring(0, 500))
-      return NextResponse.json(
-        { error: "Server returned non-JSON response", details: text.substring(0, 200) }, 
-        { status: 500 }
-      )
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
     }
-    
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${LARAVEL_API_URL}/announcements/${id}`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    })
+
     const data = await response.json()
+
     return NextResponse.json(data, { status: response.status })
   } catch (error) {
-    console.error("[v0] Error updating announcement:", error)
+    console.error("Error fetching announcement:", error)
     return NextResponse.json(
-      { error: "Failed to update announcement", message: error instanceof Error ? error.message : "Unknown error" }, 
+      {
+        success: false,
+        message: "Failed to fetch announcement",
+      },
       { status: 500 }
     )
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const { id } = await params
-    const response = await fetch(`${API_URL}/api/announcements/${id}`, {
+    
+    // Get token from HTTP-only cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get("auth_token")?.value
+
+    if (!token) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Not authenticated. Please log in again.",
+        },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+
+    console.log('Updating announcement:', {
+      id,
+      body,
+      url: `${LARAVEL_API_URL}/announcements/${id}`
+    })
+
+    const response = await fetch(`${LARAVEL_API_URL}/announcements/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+    
+    console.log('Laravel update response:', data)
+
+    return NextResponse.json(data, { status: response.status })
+  } catch (error) {
+    console.error("Error updating announcement:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to update announcement",
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    
+    // Get token from HTTP-only cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get("auth_token")?.value
+
+    if (!token) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Not authenticated. Please log in again.",
+        },
+        { status: 401 }
+      )
+    }
+
+    const response = await fetch(`${LARAVEL_API_URL}/announcements/${id}`, {
       method: "DELETE",
       headers: {
+        "Content-Type": "application/json",
         "Accept": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "X-Requested-With": "XMLHttpRequest",
       },
     })
-    
-    if (!response.ok) {
-      const text = await response.text()
-      console.error("[v0] Laravel error response:", text.substring(0, 200))
-      return NextResponse.json({ error: "Failed to delete" }, { status: response.status })
-    }
-    
-    return NextResponse.json({ success: true }, { status: 204 })
+
+    const data = await response.json()
+
+    return NextResponse.json(data, { status: response.status })
   } catch (error) {
-    console.error("[v0] Error deleting announcement:", error)
-    return NextResponse.json({ error: "Failed to delete announcement" }, { status: 500 })
+    console.error("Error deleting announcement:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to delete announcement",
+      },
+      { status: 500 }
+    )
   }
 }

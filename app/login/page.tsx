@@ -136,12 +136,14 @@ export default function LoginPage() {
       }
 
       // Success! Token is already stored by authClient.login()
+      const userRole = result.user?.role || 'citizen'
+      
       toast({
         title: "✓ Login Successful!",
         description: (
           <div>
             <p className="font-semibold">Welcome back, {result.user?.name || "User"}!</p>
-            <p className="text-sm mt-1">Role: {result.user?.role === 'admin' ? 'Administrator' : 'Citizen'}</p>
+
             <p className="text-sm">Redirecting to your dashboard...</p>
           </div>
         ),
@@ -149,11 +151,13 @@ export default function LoginPage() {
         duration: 3000,
       })
 
-      // Redirect based on role
+      // Redirect based on role - FIXED: Admin goes to /dashboard/admin/news
       setTimeout(() => {
-        if (result.user?.role === "admin") {
-          router.push("/dashboard/admin")
+        if (userRole === "admin") {
+          console.log('Redirecting admin to: /dashboard/admin/news')
+          router.push("/dashboard/admin/news")
         } else {
+          console.log('Redirecting citizen to: /dashboard/citizen')
           router.push("/dashboard/citizen")
         }
       }, 1500)

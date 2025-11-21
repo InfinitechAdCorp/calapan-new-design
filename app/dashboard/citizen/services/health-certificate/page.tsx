@@ -1,9 +1,9 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Heart } from "lucide-react";
+import { ArrowLeft, Heart, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +23,14 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import CitizenLayout from "@/components/citizenLayout";
+import { authClient } from "@/lib/auth";
+import { useToast } from "@/components/ui/use-toast";
+
 export default function HealthCertificatePage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -43,29 +48,201 @@ export default function HealthCertificatePage() {
     conditions: "",
   });
 
+  // Auto-fill form with logged-in user data
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const user = await authClient.getCurrentUser();
+
+        if (user) {
+          // Calculate age from birth date if available
+          let calculatedAge = "";
+          if (user.birth_date) {
+            const birthDate = new Date(user.birth_date);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+              age--;
+            }
+            calculatedAge = age.toString();
+          }
+
+          setFormData((prev) => ({
+            ...prev,
+            fullName: user.name || "",
+            email: user.email || "",
+            phone: user.phone_number || "",
+            address: user.address || "",
+            birthDate: user.birth_date || "",
+            age: calculatedAge,
+            sex: user.sex || "",
+          }));
+
+          toast({
+            title: "Welcome Back",
+            description: "Your profile information has been pre-filled.",
+          });
+        } else {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to continue.",
+            variant: "destructive",
+          });
+          router.push("/login");
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load your profile information.",
+          variant: "destructive",
+        });
+        // Don't redirect on error, might be a temporary network issue
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [toast, router]);
+
   const updateFormData = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value };
+
+      // Auto-calculate age when birth date changes
+      if (field === "birthDate" && typeof value === "string" && value) {
+        const birthDate = new Date(value);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        updated.age = age.toString();
+      }
+
+      return updated;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
     try {
+      // Validate required medical history fields
+      if (formData.hasAllergies && !formData.allergies.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please specify your allergies or uncheck the option.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (formData.hasMedications && !formData.medications.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please list your medications or uncheck the option.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (formData.hasConditions && !formData.conditions.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please specify your conditions or uncheck the option.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const response = await fetch("/api/health-certificate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
         body: JSON.stringify(formData),
       });
 
+      const contentType = response.headers.get("content-type");
+      let data;
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        toast({
+          title: "Server Error",
+          description: "Invalid response format. Please try again later.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (response.status === 401) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to continue.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+        return;
+      }
+
       if (response.ok) {
+        toast({
+          title: "Success!",
+          description: `Your health certificate application has been submitted. Reference: ${data.data?.reference_number || 'N/A'}`,
+        });
         router.push("/dashboard/citizen/account/applications?success=health-certificate");
+      } else {
+        toast({
+          title: "Application Failed",
+          description: data.message || "Failed to submit application. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error submitting application:", error);
+      const errorMsg =
+        error instanceof TypeError && error.message.includes("Failed to fetch")
+          ? "Network connection error. Please check your internet connection."
+          : "An unexpected error occurred. Please try again.";
+
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <CitizenLayout>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+            <p className="text-sm text-muted-foreground">Loading your information...</p>
+          </div>
+        </div>
+      </CitizenLayout>
+    );
+  }
 
   return (
     <CitizenLayout>
@@ -92,6 +269,13 @@ export default function HealthCertificatePage() {
         </div>
 
         <div className="max-w-4xl mx-auto p-4 lg:p-6">
+          {/* Info Banner */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              ℹ️ Your personal information has been pre-filled from your account. You can edit any field if needed.
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit}>
             <Card>
               <CardHeader>
@@ -163,6 +347,7 @@ export default function HealthCertificatePage() {
                         onChange={(e) =>
                           updateFormData("birthDate", e.target.value)
                         }
+                        max={new Date().toISOString().split("T")[0]}
                         required
                       />
                     </div>
@@ -174,8 +359,14 @@ export default function HealthCertificatePage() {
                         placeholder="0"
                         value={formData.age}
                         onChange={(e) => updateFormData("age", e.target.value)}
+                        readOnly={!!formData.birthDate}
                         required
                       />
+                      {formData.birthDate && (
+                        <p className="text-xs text-gray-500">
+                          Auto-calculated from birth date
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="sex">Sex *</Label>
@@ -243,6 +434,7 @@ export default function HealthCertificatePage() {
                           onChange={(e) =>
                             updateFormData("allergies", e.target.value)
                           }
+                          required={formData.hasAllergies}
                         />
                       )}
                     </div>
@@ -267,6 +459,7 @@ export default function HealthCertificatePage() {
                           onChange={(e) =>
                             updateFormData("medications", e.target.value)
                           }
+                          required={formData.hasMedications}
                         />
                       )}
                     </div>
@@ -291,6 +484,7 @@ export default function HealthCertificatePage() {
                           onChange={(e) =>
                             updateFormData("conditions", e.target.value)
                           }
+                          required={formData.hasConditions}
                         />
                       )}
                     </div>
@@ -310,7 +504,14 @@ export default function HealthCertificatePage() {
                   disabled={isSubmitting}
                   className="w-full bg-orange-500 hover:bg-orange-600"
                 >
-                  {isSubmitting ? "Submitting..." : "Submit Application"}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Application"
+                  )}
                 </Button>
               </CardContent>
             </Card>

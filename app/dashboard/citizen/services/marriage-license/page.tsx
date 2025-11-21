@@ -1,48 +1,33 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { ArrowLeft, Heart, Users, FileText, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, Heart, FileText, CheckCircle2, MapPin, Clock, AlertCircle, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import CitizenLayout from "@/components/citizenLayout"
+
 const steps = [
-  { id: 1, name: "Groom Information", icon: Users },
-  { id: 2, name: "Bride Information", icon: Heart },
-  { id: 3, name: "Review & Submit", icon: FileText },
+  { 
+    id: 1, 
+    name: "Requirements", 
+    icon: FileText,
+    description: "Documents needed for application"
+  },
+  { 
+    id: 2, 
+    name: "Application Process", 
+    icon: Heart,
+    description: "Step-by-step application guide"
+  },
+  { 
+    id: 3, 
+    name: "Important Information", 
+    icon: AlertCircle,
+    description: "Fees, validity, and notes"
+  },
 ]
 
-export default function MarriageLicensePage() {
-  const router = useRouter()
-
+export default function MarriageLicenseGuidePage() {
   const [currentStep, setCurrentStep] = useState(1)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    groomName: "",
-    groomBirthDate: "",
-    groomBirthPlace: "",
-    groomCitizenship: "Filipino",
-    groomCivilStatus: "",
-    groomAddress: "",
-    groomPhone: "",
-    groomEmail: "",
-    brideName: "",
-    brideBirthDate: "",
-    brideBirthPlace: "",
-    brideCitizenship: "Filipino",
-    brideCivilStatus: "",
-    brideAddress: "",
-    bridePhone: "",
-    brideEmail: "",
-  })
-
-  const updateFormData = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
 
   const handleNext = () => {
     if (currentStep < steps.length) setCurrentStep(currentStep + 1)
@@ -52,44 +37,17 @@ export default function MarriageLicensePage() {
     if (currentStep > 1) setCurrentStep(currentStep - 1)
   }
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true)
-    setError(null)
-
-    try {
-      const response = await fetch("/api/marriage-license", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      })
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
-        router.push("/dashboard/citizen/account/applications?success=marriage-license")
-      } else {
-        setError(data.message || "Failed to submit application")
-      }
-    } catch (error) {
-      console.error("Error submitting application:", error)
-      setError("An unexpected error occurred. Please try again.")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   return (
-    <CitizenLayout>
-    <div className="min-h-screen bg-gray-50 pb-20 lg:pb-0">
+    <div className="min-h-screen bg-white pb-20 lg:pb-0">
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">Marriage License Application</h1>
+            <h1 className="text-xl font-bold">Marriage License Guide</h1>
             <p className="text-sm text-muted-foreground">
-              Step {currentStep} of {steps.length}
+              How to get a marriage license in the Philippines
             </p>
           </div>
         </div>
@@ -118,199 +76,160 @@ export default function MarriageLicensePage() {
           </div>
         </div>
 
-        {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>}
-
         <Card>
           <CardHeader>
             <CardTitle>{steps[currentStep - 1].name}</CardTitle>
-            <CardDescription>
-              {currentStep === 1 && "Enter groom personal information"}
-              {currentStep === 2 && "Enter bride personal information"}
-              {currentStep === 3 && "Review application details"}
-            </CardDescription>
+            <CardDescription>{steps[currentStep - 1].description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {currentStep === 1 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="groomName">Full Name *</Label>
-                  <Input
-                    id="groomName"
-                    placeholder="Enter full name"
-                    value={formData.groomName}
-                    onChange={(e) => updateFormData("groomName", e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="groomBirthDate">Date of Birth *</Label>
-                    <Input
-                      id="groomBirthDate"
-                      type="date"
-                      value={formData.groomBirthDate}
-                      onChange={(e) => updateFormData("groomBirthDate", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="groomBirthPlace">Place of Birth *</Label>
-                    <Input
-                      id="groomBirthPlace"
-                      placeholder="City, Province"
-                      value={formData.groomBirthPlace}
-                      onChange={(e) => updateFormData("groomBirthPlace", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="groomCitizenship">Citizenship *</Label>
-                    <Input
-                      id="groomCitizenship"
-                      placeholder="Filipino"
-                      value={formData.groomCitizenship}
-                      onChange={(e) => updateFormData("groomCitizenship", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="groomCivilStatus">Civil Status *</Label>
-                    <Select
-                      value={formData.groomCivilStatus}
-                      onValueChange={(value) => updateFormData("groomCivilStatus", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single</SelectItem>
-                        <SelectItem value="widowed">Widowed</SelectItem>
-                        <SelectItem value="divorced">Divorced</SelectItem>
-                        <SelectItem value="annulled">Annulled</SelectItem>
-                        <SelectItem value="legally-separated">Legally Separated</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Required Documents (for both parties)</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">1. Certified True Copy of Birth Certificate (PSA)</h4>
+                      <p className="text-sm text-gray-600">Original copy issued by the Philippine Statistics Authority</p>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">2. Valid Government-Issued ID</h4>
+                      <p className="text-sm text-gray-600">Examples: Passport, Driver's License, UMID, Postal ID, Voter's ID</p>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">3. Certificate of No Marriage (CENOMAR)</h4>
+                      <p className="text-sm text-gray-600">Also from PSA, proves you are single or not currently married</p>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">4. Barangay Certificate of Residency</h4>
+                      <p className="text-sm text-gray-600">Proof of residence for at least one month in the city/municipality</p>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">5. Passport-sized Photos</h4>
+                      <p className="text-sm text-gray-600">2 copies each (4 total) - recent colored photos with white background</p>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="groomAddress">Complete Address *</Label>
-                  <Input
-                    id="groomAddress"
-                    placeholder="Street, Barangay, City"
-                    value={formData.groomAddress}
-                    onChange={(e) => updateFormData("groomAddress", e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="groomPhone">Contact Number *</Label>
-                    <Input
-                      id="groomPhone"
-                      placeholder="09XX XXX XXXX"
-                      value={formData.groomPhone}
-                      onChange={(e) => updateFormData("groomPhone", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="groomEmail">Email Address *</Label>
-                    <Input
-                      id="groomEmail"
-                      type="email"
-                      placeholder="email@example.com"
-                      value={formData.groomEmail}
-                      onChange={(e) => updateFormData("groomEmail", e.target.value)}
-                    />
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Additional Requirements (if applicable)</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">For Widows/Widowers:</h4>
+                      <p className="text-sm text-gray-600">Death Certificate of deceased spouse</p>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">For Divorced/Annulled:</h4>
+                      <p className="text-sm text-gray-600">Court decree of divorce or annulment</p>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">For Minors (18-21 years old):</h4>
+                      <p className="text-sm text-gray-600">Parental consent and parental advice certificate</p>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2">For Foreign Nationals:</h4>
+                      <p className="text-sm text-gray-600">Passport, Certificate of Legal Capacity to Contract Marriage from embassy</p>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {currentStep === 2 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="brideName">Full Name *</Label>
-                  <Input
-                    id="brideName"
-                    placeholder="Enter full name"
-                    value={formData.brideName}
-                    onChange={(e) => updateFormData("brideName", e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="brideBirthDate">Date of Birth *</Label>
-                    <Input
-                      id="brideBirthDate"
-                      type="date"
-                      value={formData.brideBirthDate}
-                      onChange={(e) => updateFormData("brideBirthDate", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="brideBirthPlace">Place of Birth *</Label>
-                    <Input
-                      id="brideBirthPlace"
-                      placeholder="City, Province"
-                      value={formData.brideBirthPlace}
-                      onChange={(e) => updateFormData("brideBirthPlace", e.target.value)}
-                    />
+              <div className="space-y-6">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex gap-2">
+                    <MapPin className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-orange-900">Where to Apply</h4>
+                      <p className="text-sm text-orange-800 mt-1">
+                        Local Civil Registrar's Office of the city or municipality where either party has resided for at least one month
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="brideCitizenship">Citizenship *</Label>
-                    <Input
-                      id="brideCitizenship"
-                      placeholder="Filipino"
-                      value={formData.brideCitizenship}
-                      onChange={(e) => updateFormData("brideCitizenship", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="brideCivilStatus">Civil Status *</Label>
-                    <Select
-                      value={formData.brideCivilStatus}
-                      onValueChange={(value) => updateFormData("brideCivilStatus", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single</SelectItem>
-                        <SelectItem value="widowed">Widowed</SelectItem>
-                        <SelectItem value="divorced">Divorced</SelectItem>
-                        <SelectItem value="annulled">Annulled</SelectItem>
-                        <SelectItem value="legally-separated">Legally Separated</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="brideAddress">Complete Address *</Label>
-                  <Input
-                    id="brideAddress"
-                    placeholder="Street, Barangay, City"
-                    value={formData.brideAddress}
-                    onChange={(e) => updateFormData("brideAddress", e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bridePhone">Contact Number *</Label>
-                    <Input
-                      id="bridePhone"
-                      placeholder="09XX XXX XXXX"
-                      value={formData.bridePhone}
-                      onChange={(e) => updateFormData("bridePhone", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="brideEmail">Email Address *</Label>
-                    <Input
-                      id="brideEmail"
-                      type="email"
-                      placeholder="email@example.com"
-                      value={formData.brideEmail}
-                      onChange={(e) => updateFormData("brideEmail", e.target.value)}
-                    />
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Step-by-Step Process</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        1
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">Prepare all required documents</h4>
+                        <p className="text-sm text-gray-600 mt-1">Gather all documents listed in the requirements section. Make sure all are original copies.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        2
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">Visit the Local Civil Registrar's Office</h4>
+                        <p className="text-sm text-gray-600 mt-1">Both parties must appear together. Go to the office during business hours (usually 8am-5pm, Monday-Friday).</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        3
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">Fill out the Marriage License Application Form</h4>
+                        <p className="text-sm text-gray-600 mt-1">Staff will provide the form. Fill it out completely and accurately.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        4
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">Submit documents and pay the fee</h4>
+                        <p className="text-sm text-gray-600 mt-1">Submit all required documents along with the application fee.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        5
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">Attend the marriage counseling seminar</h4>
+                        <p className="text-sm text-gray-600 mt-1">Required by law. Usually conducted by the Local Civil Registrar or authorized personnel.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        6
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">Marriage license posting</h4>
+                        <p className="text-sm text-gray-600 mt-1">Your application will be posted publicly for 10 consecutive days to allow objections.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-semibold">
+                        7
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">Claim your marriage license</h4>
+                        <p className="text-sm text-gray-600 mt-1">After the 10-day posting period, you can claim your marriage license.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -319,69 +238,89 @@ export default function MarriageLicensePage() {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">Groom Information</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
-                      <p>
-                        <span className="font-medium">Name:</span> {formData.groomName}
-                      </p>
-                      <p>
-                        <span className="font-medium">Birth Date:</span> {formData.groomBirthDate}
-                      </p>
-                      <p>
-                        <span className="font-medium">Birth Place:</span> {formData.groomBirthPlace}
-                      </p>
-                      <p>
-                        <span className="font-medium">Citizenship:</span> {formData.groomCitizenship}
-                      </p>
-                      <p>
-                        <span className="font-medium">Civil Status:</span> {formData.groomCivilStatus}
-                      </p>
-                      <p>
-                        <span className="font-medium">Address:</span> {formData.groomAddress}
-                      </p>
-                      <p>
-                        <span className="font-medium">Phone:</span> {formData.groomPhone}
-                      </p>
-                      <p>
-                        <span className="font-medium">Email:</span> {formData.groomEmail}
-                      </p>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex gap-2">
+                      <DollarSign className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-green-900">Application Fee</h4>
+                        <p className="text-sm text-green-800 mt-1">
+                          Fees vary by city/municipality, typically ranging from ₱200 to ₱500. Check with your local Civil Registrar's Office for exact amount.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">Bride Information</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
-                      <p>
-                        <span className="font-medium">Name:</span> {formData.brideName}
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex gap-2">
+                      <Clock className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-blue-900">Processing Time</h4>
+                        <p className="text-sm text-blue-800 mt-1">
+                          Minimum of 10 days due to the posting requirement. Total processing may take 2-3 weeks.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex gap-2">
+                      <AlertCircle className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-purple-900">Validity Period</h4>
+                        <p className="text-sm text-purple-800 mt-1">
+                          Marriage license is valid for 120 days from date of issuance. You must get married within this period.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Important Reminders</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm">
+                        ✓ Both parties must be <strong>at least 18 years old</strong>. Those aged 18-21 need parental consent.
                       </p>
-                      <p>
-                        <span className="font-medium">Birth Date:</span> {formData.brideBirthDate}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm">
+                        ✓ Both parties must <strong>appear in person together</strong> when applying.
                       </p>
-                      <p>
-                        <span className="font-medium">Birth Place:</span> {formData.brideBirthPlace}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm">
+                        ✓ The marriage ceremony can be held <strong>anywhere in the Philippines</strong> once you have the license.
                       </p>
-                      <p>
-                        <span className="font-medium">Citizenship:</span> {formData.brideCitizenship}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm">
+                        ✓ You must have <strong>two witnesses</strong> (of legal age) present during the marriage ceremony.
                       </p>
-                      <p>
-                        <span className="font-medium">Civil Status:</span> {formData.brideCivilStatus}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm">
+                        ✓ After the ceremony, your solemnizing officer will register the marriage with the Local Civil Registrar.
                       </p>
-                      <p>
-                        <span className="font-medium">Address:</span> {formData.brideAddress}
-                      </p>
-                      <p>
-                        <span className="font-medium">Phone:</span> {formData.bridePhone}
-                      </p>
-                      <p>
-                        <span className="font-medium">Email:</span> {formData.brideEmail}
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm">
+                        ✓ You can request a <strong>Marriage Certificate</strong> from PSA after registration (usually available after a few months).
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <p className="text-sm text-orange-800">
-                    <strong>Note:</strong> Both parties must appear together at the Local Civil Registrars Office for
-                    the marriage license application interview.
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-900 mb-2">Grounds for Denial</h4>
+                  <p className="text-sm text-red-800">
+                    Your application may be denied if either party is already married, below legal age without consent, or if there are valid legal impediments to marriage.
                   </p>
                 </div>
               </div>
@@ -389,7 +328,7 @@ export default function MarriageLicensePage() {
 
             <div className="flex gap-3 pt-4">
               {currentStep > 1 && (
-                <Button variant="outline" onClick={handleBack} className="flex-1 bg-transparent">
+                <Button variant="outline" onClick={handleBack} className="flex-1">
                   Back
                 </Button>
               )}
@@ -398,12 +337,8 @@ export default function MarriageLicensePage() {
                   Next
                 </Button>
               ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600"
-                >
-                  {isSubmitting ? "Submitting..." : "Submit Application"}
+                <Button onClick={() => setCurrentStep(1)} className="flex-1 bg-orange-500 hover:bg-orange-600">
+                  Back to Start
                 </Button>
               )}
             </div>
@@ -411,6 +346,5 @@ export default function MarriageLicensePage() {
         </Card>
       </div>
     </div>
-  </CitizenLayout>
   )
 }

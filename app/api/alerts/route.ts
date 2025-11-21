@@ -1,7 +1,7 @@
 // app/api/alerts/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export async function GET() {
   try {
@@ -14,17 +14,17 @@ export async function GET() {
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch alerts: ${response.statusText}`)
+      // If backend returns 404 or error, return empty array instead of throwing
+      console.warn(`Backend alerts API returned ${response.status}: ${response.statusText}`)
+      return NextResponse.json([])
     }
 
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching alerts:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch alerts' },
-      { status: 500 }
-    )
+    // Return empty array instead of error to prevent frontend from breaking
+    return NextResponse.json([])
   }
 }
 

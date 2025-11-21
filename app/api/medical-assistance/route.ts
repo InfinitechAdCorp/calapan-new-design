@@ -1,147 +1,188 @@
-import { type NextRequest, NextResponse } from "next/server"
+// app/api/medical-assistance/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+const LARAVEL_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
-function camelToSnake(str: string): string {
-  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+export async function POST(request: NextRequest) {
+  try {
+    // Get token from HTTP-only cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('auth_token')?.value
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Not authenticated. Please log in again.' },
+        { status: 401 }
+      )
+    }
+
+    // Get FormData from request
+    const formData = await request.formData()
+
+    console.log('Proxying medical assistance request to Laravel:', {
+      url: `${LARAVEL_API_URL}/medical-assistance`,
+      hasAuth: !!token,
+      hasFiles: formData.has('supportingDocuments'),
+    })
+
+    // Forward FormData to Laravel backend with Bearer token
+    const response = await fetch(`${LARAVEL_API_URL}/medical-assistance`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
+    })
+
+    // Get the raw text first to debug
+    const responseText = await response.text()
+    
+    console.log('Laravel raw response:', {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      textLength: responseText.length,
+      textPreview: responseText.substring(0, 200)
+    })
+
+    // Try to parse as JSON
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      console.error('Raw response:', responseText)
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid response from server. Please check Laravel logs.',
+          debug: {
+            status: response.status,
+            contentType: response.headers.get('content-type'),
+            preview: responseText.substring(0, 500)
+          }
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log('Laravel response:', {
+      status: response.status,
+      success: data.success,
+      message: data.message,
+    })
+
+    // Return Laravel response
+    return NextResponse.json(data, { status: response.status })
+
+  } catch (error) {
+    console.error('API route error:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error',
+      },
+      { status: 500 }
+    )
+  }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get("id")
+    // Get token from HTTP-only cookie
+    const cookieStore = await cookies()
+    const token = cookieStore.get('auth_token')?.value
 
-    const url = id ? `${API_URL}/api/medical-assistance/${id}` : `${API_URL}/api/medical-assistance`
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Not authenticated. Please log in again.' },
+        { status: 401 }
+      )
+    }
+
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams
+    const status = searchParams.get('status')
+    const search = searchParams.get('search')
+    const page = searchParams.get('page')
+    const perPage = searchParams.get('per_page')
+
+    // Build query string
+    const queryParams = new URLSearchParams()
+    if (status && status !== 'all') queryParams.append('status', status)
+    if (search) queryParams.append('search', search)
+    if (page) queryParams.append('page', page)
+    if (perPage) queryParams.append('per_page', perPage)
+
+    const queryString = queryParams.toString()
+    // Use the admin route for fetching all applications
+    const url = `${LARAVEL_API_URL}/medical-assistance${queryString ? `?${queryString}` : ''}`
+
+    console.log('Fetching medical assistance applications:', {
+      url,
+      hasAuth: !!token,
+    })
 
     const response = await fetch(url, {
-      method: "GET",
+      method: 'GET',
       headers: {
-        "Content-Type": "application/json",
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest',
       },
     })
 
-    const contentType = response.headers.get("content-type")
+    // Get raw text first to check what we're receiving
+    const responseText = await response.text()
+    
+    console.log('Laravel raw response:', {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      textLength: responseText.length,
+      textPreview: responseText.substring(0, 200)
+    })
+
+    // Try to parse as JSON
     let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      console.error('Raw response (first 1000 chars):', responseText.substring(0, 1000))
+      console.error('Raw response (last 500 chars):', responseText.substring(Math.max(0, responseText.length - 500)))
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid JSON response from server. Please check Laravel logs for errors.',
+          debug: {
+            status: response.status,
+            contentType: response.headers.get('content-type'),
+            preview: responseText.substring(0, 500)
+          }
+        },
+        { status: 500 }
+      )
+    }
 
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json()
-    } else {
-      const text = await response.text()
-      console.error("[v0] Non-JSON response from backend:", text)
-      data = {
+    console.log('Laravel response:', {
+      status: response.status,
+      success: data.success,
+    })
+
+    return NextResponse.json(data, { status: response.status })
+
+  } catch (error) {
+    console.error('API route error:', error)
+    return NextResponse.json(
+      {
         success: false,
-        message: "Server returned an invalid response. Please check your backend API.",
-        error: text.substring(0, 200),
-      }
-    }
-
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
-    console.error("Error fetching medical assistances:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const formData = await request.formData()
-    const snakeCaseFormData = new FormData()
-
-    formData.forEach((value, key) => {
-      const snakeKey = camelToSnake(key)
-      snakeCaseFormData.append(snakeKey, value)
-    })
-
-    const response = await fetch(`${API_URL}/api/medical-assistance`, {
-      method: "POST",
-      body: snakeCaseFormData,
-    })
-
-    const contentType = response.headers.get("content-type")
-    let data
-
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json()
-    } else {
-      const text = await response.text()
-      console.error("[v0] Non-JSON response from backend:", text)
-      data = {
-        success: false,
-        message: "Server returned an invalid response. Please check your backend API.",
-        error: text.substring(0, 200),
-      }
-    }
-
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
-    console.error("Error creating medical assistance:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get("id")
-
-    if (!id) {
-      return NextResponse.json({ message: "ID is required" }, { status: 400 })
-    }
-
-    const formData = await request.formData()
-    const snakeCaseFormData = new FormData()
-
-    formData.forEach((value, key) => {
-      const snakeKey = camelToSnake(key)
-      snakeCaseFormData.append(snakeKey, value)
-    })
-
-    snakeCaseFormData.append("_method", "PUT")
-
-    const response = await fetch(`${API_URL}/api/medical-assistance/${id}`, {
-      method: "POST",
-      body: snakeCaseFormData,
-    })
-
-    const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
-    console.error("Error updating medical assistance:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get("id")
-
-    if (!id) {
-      return NextResponse.json({ message: "ID is required" }, { status: 400 })
-    }
-
-    const response = await fetch(`${API_URL}/api/medical-assistance/${id}`, {
-      method: "DELETE",
-    })
-
-    const contentType = response.headers.get("content-type")
-    let data
-
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json()
-    } else {
-      const text = await response.text()
-      console.error("[v0] Non-JSON response from backend:", text)
-      data = {
-        success: false,
-        message: "Server returned an invalid response. Please check your backend API.",
-        error: text.substring(0, 200),
-      }
-    }
-
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
-    console.error("Error deleting medical assistance:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+        message: error instanceof Error ? error.message : 'Internal server error',
+      },
+      { status: 500 }
+    )
   }
 }

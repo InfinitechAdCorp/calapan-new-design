@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
   console.log('Middleware:', { pathname, hasToken: !!token })
 
   // Public paths that don't require authentication
-  const publicPaths = ['/', '/login', '/register']
+  const publicPaths = ['/', '/login', '/register', '/announcements','/news','/services','/about','/contact','/cookies','/terms','/privacy']
   const isPublicPath = publicPaths.includes(pathname)
   
   // API routes should be handled separately
@@ -25,23 +25,54 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // ALLOW public paths even with token (so we can access login to re-login)
-  if (isPublicPath) {
-    // Only redirect to dashboard if on login/register page with valid token
-    if (token && (pathname === '/login' || pathname === '/register')) {
-      console.log('Middleware: Has token, redirecting from login to dashboard')
-      return NextResponse.redirect(new URL('/dashboard/citizen', request.url))
-    }
-    console.log('Middleware: Public path, allowing access')
-    return NextResponse.next()
-  }
-
   // If accessing protected route without token, redirect to login
-  if (!token) {
+  if (!token && !isPublicPath) {
     console.log('Middleware: No token, redirecting to login')
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
+  }
+
+  // If has token and on login/register page, get user role to redirect properly
+  if (token && (pathname === '/login' || pathname === '/register')) {
+    try {
+      // Fetch user data to determine role
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/auth/me`, {
+        headers: {
+          'Cookie': `auth_token=${token}`,
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const userRole = data.user?.role
+
+        console.log('Middleware: User role detected:', userRole)
+
+        // Redirect based on role
+        if (userRole === 'admin') {
+          console.log('Middleware: Redirecting admin to admin dashboard')
+          return NextResponse.redirect(new URL('/dashboard/admin/news', request.url))
+        } else if (userRole === 'citizen') {
+          console.log('Middleware: Redirecting citizen to citizen dashboard')
+          return NextResponse.redirect(new URL('/dashboard/citizen', request.url))
+        }
+      }
+    } catch (error) {
+      console.error('Middleware: Error fetching user role:', error)
+    }
+
+    // Default redirect if role check fails
+    return NextResponse.redirect(new URL('/dashboard/citizen', request.url))
+  }
+
+  // Allow access to public paths
+  if (isPublicPath) {
+    console.log('Middleware: Public path, allowing access')
+    return NextResponse.next()
   }
 
   console.log('Middleware: Allowing access to protected route')

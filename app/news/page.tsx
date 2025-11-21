@@ -7,8 +7,8 @@ export default function NewsPage() {
   return (
     <PageLayout
       title="News"
-      subtitle="Read the latest updates and stories from our city"
-      image="/newspaper-journalism-city-news.jpg"
+      subtitle="Read the latest stories from Calapan City"
+      image="/news-calapan.jpg"
     >
       <NewsSection />
     </PageLayout>

@@ -7,7 +7,7 @@ export default function AboutPage() {
   return (
     <PageLayout
       title="About Calapan City"
-      subtitle="Learn more about our city and our mission"
+      subtitle="Explore our city's story and the mission behind what we do"
       image="/calapan-city-landscape-history-culture.jpg"
     >
       <AboutSection />

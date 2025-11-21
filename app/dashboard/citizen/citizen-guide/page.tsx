@@ -104,7 +104,7 @@ export default function CitizenGuidePage() {
                   </p>
                 </div>
               </div>
-              <Link href="/services/business-permit">
+              <Link href="/dashboard/citizen/services/business-permit">
                 <Button className="w-full bg-orange-500 hover:bg-orange-600 mt-4">Apply for Business Permit</Button>
               </Link>
             </div>

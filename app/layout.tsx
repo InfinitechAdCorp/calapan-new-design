@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
-
+import CookieConsent from "@/components/cookie-consent"
 const geist = Geist({ subsets: ["latin"] })
 const geistMono = Geist_Mono({ subsets: ["latin"] })
 
@@ -158,11 +158,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Viewport - Critical for PWA */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
+        
+        {/* CRITICAL: Explicit manifest link */}
+        <link rel="manifest" href="/manifest.json" />
+        
         {/* Essential Meta Tags */}
         <meta name="theme-color" content="#ea580c" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Calapan City" />
         
         {/* Geographic Tags */}
         <meta name="geo.region" content="PH-MDR" />
@@ -183,14 +190,27 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         
-        {/* Service Worker Registration */}
+        {/* Service Worker Registration - Enhanced with logging */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js');
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(function(registration) {
+                      console.log('✅ ServiceWorker registered successfully:', registration.scope);
+                      
+                      // Check for updates
+                      registration.addEventListener('updatefound', function() {
+                        console.log('🔄 ServiceWorker update found');
+                      });
+                    })
+                    .catch(function(err) {
+                      console.error('❌ ServiceWorker registration failed:', err);
+                    });
                 });
+              } else {
+                console.warn('⚠️ ServiceWorker not supported in this browser');
               }
             `,
           }}
@@ -199,6 +219,7 @@ export default function RootLayout({
       <body className={`${geist.className} antialiased bg-gradient-to-br from-emerald-50 via-orange-50 to-emerald-50`}>
         {children}
         <Toaster />
+          <CookieConsent />
       </body>
     </html>
   )

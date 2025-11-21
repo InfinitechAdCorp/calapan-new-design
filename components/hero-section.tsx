@@ -1,22 +1,21 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { ArrowRight, Sparkles } from "lucide-react"
+import { Sparkles } from "lucide-react"
 
 export default function HeroSection() {
   return (
     <section className="relative min-h-[500px] flex items-center justify-center overflow-hidden pt-20">
       <div className="absolute inset-0 bg-gradient-to-br from-orange-50 via-white to-emerald-50 z-0" />
 
-    <div
-  className="absolute inset-0 opacity-30 z-0"
-  style={{
-    backgroundImage: "url('/city-government-building-calapan.jpg')",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-  }}
-/>
-
+      <div
+        className="absolute inset-0 opacity-30 z-0"
+        style={{
+          backgroundImage: "url('/city-government-building-calapan.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      />
 
       <div className="absolute inset-0 overflow-hidden z-0">
         <motion.div
@@ -79,10 +78,7 @@ export default function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.3 }}
           className="flex flex-col sm:flex-row gap-4 justify-center"
-        >
-         
-          
-        </motion.div>
+        ></motion.div>
       </div>
     </section>
   )

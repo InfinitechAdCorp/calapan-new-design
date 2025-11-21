@@ -1,12 +1,14 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
-import { ChevronLeft, MapPin, Upload, AlertCircle, CheckCircle2 } from "lucide-react"
+import { ChevronLeft, MapPin, Upload, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import CitizenLayout from "@/components/citizenLayout"
+import { useAuth } from "@/hooks/useAuth"
+import { useToast } from "@/components/ui/use-toast"
+
 interface ApiResponse {
   success: boolean
   message: string
@@ -24,6 +26,9 @@ interface ApiResponse {
 }
 
 export default function ReportIssuePage() {
+  const { user, loading: authLoading } = useAuth(true)
+  const { toast } = useToast()
+  
   const [formData, setFormData] = useState({
     category: "",
     title: "",
@@ -34,8 +39,6 @@ export default function ReportIssuePage() {
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [reportId, setReportId] = useState<string>("")
   const [error, setError] = useState<string>("")
 
   const categories = [
@@ -55,7 +58,11 @@ export default function ReportIssuePage() {
     // Validate file size (10MB max)
     const validFiles = selectedFiles.filter(file => {
       if (file.size > 10 * 1024 * 1024) {
-        alert(`${file.name} is too large. Max size is 10MB.`)
+        toast({
+          variant: "warning",
+          title: "File too large",
+          description: `${file.name} exceeds 10MB limit.`,
+        })
         return false
       }
       return true
@@ -107,21 +114,36 @@ export default function ReportIssuePage() {
         formDataToSend.append(`file_${index}`, file)
       })
 
-      // Submit to API
+      // Submit to API (this will automatically include the session cookie)
       const response = await fetch("/api/reports/submit", {
         method: "POST",
+        credentials: "include", // Important: Send cookies
         body: formDataToSend,
       })
 
       const result: ApiResponse = await response.json()
 
       if (response.ok && result.success) {
-        // Success
-        setReportId(result.data?.report_id || "")
-        setSubmitted(true)
+        // Success - Show toast notification
+        toast({
+          variant: "success",
+          title: "Report Submitted!",
+          description: `Report ID: ${result.data?.report_id || "N/A"}. Track it in your reports section.`,
+        })
         
         // Clean up object URLs
         previews.forEach(preview => URL.revokeObjectURL(preview))
+        
+        // Reset form
+        setFormData({
+          category: "",
+          title: "",
+          description: "",
+          location: "",
+          urgency: "medium",
+        })
+        setFiles([])
+        setPreviews([])
       } else {
         // Handle validation errors
         if (result.errors) {
@@ -139,253 +161,214 @@ export default function ReportIssuePage() {
     }
   }
 
-  if (submitted) {
+  // Show loading state while checking authentication
+  if (authLoading) {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
-        <header className="bg-orange-600 text-white px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <ChevronLeft className="w-6 h-6" />
-            </Link>
-            <h1 className="text-xl font-bold">Report Submitted</h1>
-          </div>
-        </header>
-
-        <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
-            <CheckCircle2 className="w-12 h-12 text-green-600" />
-          </div>
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-3 text-center">Thank You!</h2>
-          <p className="text-gray-600 text-center mb-8 max-w-sm">
-            Your report has been submitted successfully. We will review it and take appropriate action.
-          </p>
-
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-8 max-w-sm">
-            <p className="text-sm text-orange-900 font-semibold mb-2">
-              Report ID: {reportId}
-            </p>
-            <p className="text-xs text-orange-700">
-              You can track your report status in the Reports section.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 w-full max-w-sm">
-            <Link 
-              href="/dashboard/citizen/view-reports" 
-              className="w-full bg-orange-600 text-white py-3 rounded-xl font-semibold text-center"
-            >
-              View My Reports
-            </Link>
-            <Link 
-              href="/dashboard/citizen/" 
-              className="w-full bg-gray-100 text-gray-900 py-3 rounded-xl font-semibold text-center"
-            >
-              Back to Home
-            </Link>
-          </div>
-        </main>
-      </div>
+      <CitizenLayout>
+        <div className="flex flex-col min-h-screen bg-white items-center justify-center">
+          <div className="text-gray-600">Loading...</div>
+        </div>
+      </CitizenLayout>
     )
   }
 
   return (
     <CitizenLayout>
-    <div className="flex flex-col min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-orange-600 text-white px-4 py-4">
-        <div className="flex items-center gap-3 mb-2">
-          <Link href="/dashboard/citizen/">
-            <ChevronLeft className="w-6 h-6" />
-          </Link>
-          <h1 className="text-xl font-bold">Report an Issue</h1>
-        </div>
-        <p className="text-orange-100 text-sm">Help us improve Calapan City</p>
-      </header>
+      <div className="flex flex-col min-h-screen bg-white">
+        {/* Header */}
+        <header className="bg-orange-600 text-white px-4 py-4">
+          <div className="flex items-center gap-3 mb-2">
+            <Link href="/dashboard/citizen/">
+              <ChevronLeft className="w-6 h-6" />
+            </Link>
+            <h1 className="text-xl font-bold">Report an Issue</h1>
+          </div>
+          <p className="text-orange-100 text-sm">Help us improve Calapan City</p>
+        </header>
 
-      {/* Main Content */}
-      <main className="flex-1 px-4 py-6 pb-24">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-red-900">
-                <p className="font-semibold mb-1">Error</p>
-                <p className="text-red-700">{error}</p>
+        {/* Main Content */}
+        <main className="flex-1 px-4 py-6 pb-24">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-red-900">
+                  <p className="font-semibold mb-1">Error</p>
+                  <p className="text-red-700">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Category Selection */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                Issue Category *
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, category: cat.value })}
+                    className={`p-4 rounded-xl border-2 transition-all ${
+                      formData.category === cat.value
+                        ? "border-orange-600 bg-orange-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">{cat.icon}</div>
+                    <div className="text-sm font-medium text-gray-900">{cat.label}</div>
+                  </button>
+                ))}
               </div>
             </div>
-          )}
 
-          {/* Category Selection */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-3">
-              Issue Category *
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {categories.map((cat) => (
-                <button
-                  key={cat.value}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, category: cat.value })}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.category === cat.value
-                      ? "border-orange-600 bg-orange-50"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <div className="text-2xl mb-2">{cat.icon}</div>
-                  <div className="text-sm font-medium text-gray-900">{cat.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Issue Title *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Brief description of the issue"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Detailed Description *
-            </label>
-            <textarea
-              required
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Provide more details about the issue..."
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-            />
-          </div>
-
-          {/* Location */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              Location *
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Issue Title *
+              </label>
               <input
                 type="text"
                 required
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                placeholder="Street, Barangay, or landmark"
-                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Brief description of the issue"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
-          </div>
 
-          {/* Urgency Level */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-3">
-              Urgency Level *
-            </label>
-            <div className="flex gap-3">
-              {[
-                { value: "low", label: "Low", color: "bg-green-100 text-green-700 border-green-300" },
-                { value: "medium", label: "Medium", color: "bg-yellow-100 text-yellow-700 border-yellow-300" },
-                { value: "high", label: "High", color: "bg-red-100 text-red-700 border-red-300" },
-              ].map((urgency) => (
-                <button
-                  key={urgency.value}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, urgency: urgency.value })}
-                  className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                    formData.urgency === urgency.value
-                      ? urgency.color
-                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                  }`}
-                >
-                  {urgency.label}
-                </button>
-              ))}
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Detailed Description *
+              </label>
+              <textarea
+                required
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Provide more details about the issue..."
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+              />
             </div>
-          </div>
 
-          {/* Photo/Video Upload */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-3">
-              Photos/Videos (Optional, max 5)
-            </label>
+            {/* Location */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Location *
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  required
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="Street, Barangay, or landmark"
+                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+            </div>
 
-            {/* File Previews */}
-            {previews.length > 0 && (
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                {previews.map((preview, index) => (
-                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                    <Image
-                      src={preview}
-                      alt={`Preview ${index + 1}`}
-                      fill
-                      className="object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors z-10"
-                    >
-                      ×
-                    </button>
-                  </div>
+            {/* Urgency Level */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                Urgency Level *
+              </label>
+              <div className="flex gap-3">
+                {[
+                  { value: "low", label: "Low", color: "bg-green-100 text-green-700 border-green-300" },
+                  { value: "medium", label: "Medium", color: "bg-yellow-100 text-yellow-700 border-yellow-300" },
+                  { value: "high", label: "High", color: "bg-red-100 text-red-700 border-red-300" },
+                ].map((urgency) => (
+                  <button
+                    key={urgency.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, urgency: urgency.value })}
+                    className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
+                      formData.urgency === urgency.value
+                        ? urgency.color
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    {urgency.label}
+                  </button>
                 ))}
               </div>
-            )}
-
-            {/* Upload Button */}
-            {files.length < 5 && (
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition-colors">
-                <div className="flex flex-col items-center">
-                  <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                  <p className="text-sm font-medium text-gray-600">Upload photos or videos</p>
-                  <p className="text-xs text-gray-500 mt-1">PNG, JPG, MP4 (max 10MB each)</p>
-                </div>
-                <input 
-                  type="file" 
-                  multiple 
-                  accept="image/*,video/*" 
-                  onChange={handleFileChange} 
-                  className="hidden" 
-                />
-              </label>
-            )}
-          </div>
-
-          {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-blue-900">
-              <p className="font-semibold mb-1">Your report helps improve our city</p>
-              <p className="text-blue-700">
-                All reports are reviewed by city officials. You will receive updates on the status of your report.
-              </p>
             </div>
-          </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading || !formData.category}
-            className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Submitting Report..." : "Submit Report"}
-          </button>
-        </form>
-      </main>
-    </div>
+            {/* Photo/Video Upload */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                Photos/Videos (Optional, max 5)
+              </label>
+
+              {/* File Previews */}
+              {previews.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  {previews.map((preview, index) => (
+                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                      <Image
+                        src={preview}
+                        alt={`Preview ${index + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-600 transition-colors z-10"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Upload Button */}
+              {files.length < 5 && (
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition-colors">
+                  <div className="flex flex-col items-center">
+                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                    <p className="text-sm font-medium text-gray-600">Upload photos or videos</p>
+                    <p className="text-xs text-gray-500 mt-1">PNG, JPG, MP4 (max 10MB each)</p>
+                  </div>
+                  <input 
+                    type="file" 
+                    multiple 
+                    accept="image/*,video/*" 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-900">
+                <p className="font-semibold mb-1">Your report helps improve our city</p>
+                <p className="text-blue-700">
+                  All reports are reviewed by city officials. You will receive updates on the status of your report.
+                </p>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading || !formData.category}
+              className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg active:scale-98 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Submitting Report..." : "Submit Report"}
+            </button>
+          </form>
+        </main>
+      </div>
     </CitizenLayout>
   )
 }

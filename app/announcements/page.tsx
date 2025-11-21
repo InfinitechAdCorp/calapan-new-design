@@ -7,7 +7,7 @@ export default function AnnouncementsPage() {
     <PageLayout
       title="Announcements"
       subtitle="Stay updated with the latest news from Calapan City"
-      image="/city-announcements-bulletin-board.jpg"
+      image="/SSSS.jpg"
     >
       <AnnouncementsSection />
     </PageLayout>

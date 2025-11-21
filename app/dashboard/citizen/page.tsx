@@ -25,7 +25,7 @@ export default function CitizenDashboard() {
     { icon: GraduationCap, label: 'Students', color: 'bg-yellow-50', iconColor: 'text-yellow-600', path: '/dashboard/citizen/students' },
     { icon: Rocket, label: 'Startup', color: 'bg-purple-50', iconColor: 'text-purple-600', path: '/dashboard/citizen/startup' },
     { icon: Building2, label: 'Business', color: 'bg-blue-50', iconColor: 'text-blue-600', path: '/dashboard/citizen/business' },
-    { icon: Grid3x3, label: 'View All', color: 'bg-teal-50', iconColor: 'text-teal-600', path: '/dashboard/citizen/all-services' },
+    // { icon: Grid3x3, label: 'View All', color: 'bg-teal-50', iconColor: 'text-teal-600', path: '/dashboard/citizen/all-services' },
   ];
 
   const quickActions = [
@@ -35,7 +35,7 @@ export default function CitizenDashboard() {
       description: 'One-tap emergency hotline',
       color: 'bg-red-50',
       iconBg: 'bg-red-500',
-      path: '/dashboard/citizen/emergency-call'
+      path: '/dashboard/citizen/emergency'
     },
     { 
       icon: MapPin, 
